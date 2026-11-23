@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">签到助手</string>
+    <string name="title_activity_main">签到助手</string>
+    <string name="package_name">cn.workbuddy.checkin</string>
+    <string name="custom_url_scheme">cn.workbuddy.checkin</string>
+</resources>

@@ -1,0 +1,11 @@
+{
+  "appId": "cn.workbuddy.checkin",
+  "appName": "签到助手",
+  "webDir": "public",
+  "server": {
+    "androidScheme": "https"
+  },
+  "android": {
+    "allowMixedContent": false
+  }
+}

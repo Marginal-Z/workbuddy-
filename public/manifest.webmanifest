@@ -1,0 +1,28 @@
+{
+  "name": "签到助手 · WorkBuddy",
+  "short_name": "签到助手",
+  "description": "登录 WorkBuddy 账号，每天自动完成签到，连签不断。",
+  "lang": "zh-CN",
+  "dir": "ltr",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f3f2ee",
+  "theme_color": "#f3f2ee",
+  "categories": ["productivity", "utilities"],
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-maskable.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}

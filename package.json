@@ -1,0 +1,20 @@
+{
+  "name": "workbuddy-checkin",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "WorkBuddy 每日签到助手 · 网页 App / PWA",
+  "scripts": {
+    "start": "node server.mjs",
+    "dev": "node server.mjs"
+  },
+  "devDependencies": {
+    "@capacitor/android": "^6.2.3",
+    "@capacitor/cli": "^6.2.3",
+    "@capacitor/core": "^6.2.3",
+    "playwright-core": "^1.49.1"
+  },
+  "dependencies": {
+    "web-push": "^4.0.0"
+  }
+}

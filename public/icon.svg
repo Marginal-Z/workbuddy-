@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="签到助手">
+  <rect width="512" height="512" rx="116" fill="#17171a"/>
+  <circle cx="256" cy="256" r="118" fill="none" stroke="#f3f2ee" stroke-width="10" opacity="0.28"/>
+  <path d="M199 259l38 38 78-90" fill="none" stroke="#f3f2ee" stroke-width="24"
+        stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="256" cy="392" r="10" fill="#8fc0aa"/>
+</svg>
