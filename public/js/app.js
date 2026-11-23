@@ -899,6 +899,69 @@ function openLoginSheet(opts = {}) {
   `);
 }
 
+const TOKEN_SNIPPET = `(() => {
+  const out = {};
+  const scan = (s) => {
+    for (let i = 0; i < s.length; i++) {
+      const v = s.getItem(s.key(i));
+      if (!v) continue;
+      try {
+        const j = JSON.parse(v);
+        const t = j.accessToken || j.access_token || j.token;
+        if (typeof t === 'string' && t.length > 20) {
+          out.accessToken = t;
+          out.uid = String(j.uid || j.userId || j.user_id || j.sub || '');
+          out.domain = location.hostname;
+        }
+      } catch {}
+    }
+  };
+  scan(localStorage); scan(sessionStorage);
+  if (!out.accessToken) return console.log('没找到，刷新页面重试或手动看 Application → Local Storage');
+  copy(JSON.stringify(out));
+  console.log('已复制，粘回签到助手即可', out.uid ? 'UID ' + out.uid : '');
+})()`;
+
+function openTokenGuide() {
+  openSheet(`
+    <h2 class="sheet-title">授权信息从哪里复制</h2>
+    <p class="sheet-sub">签到助手需要一个令牌代替密码。二选一，推荐第一种。</p>
+
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">A</div>
+        <div>
+          <div class="step-title">电脑网页版（最快）</div>
+          <div class="step-text">电脑浏览器打开 workbuddy 官网并登录 → 按 F12 打开开发者工具 → 切到 Console → 粘贴下面这段，回车。它会自动把授权信息复制到剪贴板。</div>
+        </div>
+      </div>
+    </div>
+
+    <pre class="code">${esc(TOKEN_SNIPPET)}</pre>
+    <button class="btn btn-soft" style="height:44px;margin-top:10px;font-size:14px" data-act="copy-snippet">复制这段代码</button>
+    <div class="hint">在电脑上执行后会把授权信息复制到剪贴板，粘到「授权信息」里即可，UID 会自动识别。</div>
+
+    <div class="steps" style="margin-top:22px">
+      <div class="step">
+        <div class="step-num">B</div>
+        <div>
+          <div class="step-title">桌面客户端文件</div>
+          <div class="step-text">登录 WorkBuddy 桌面客户端后，用记事本打开 <strong>workbuddy-desktop.info</strong>，里面就有 accessToken。</div>
+          <div class="step-text" style="margin-top:6px">Windows 一般在 <code>%APPDATA%\WorkBuddy</code>，macOS 在 <code>~/Library/Application Support/WorkBuddy</code>。</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="banner" style="margin-top:16px">${icons.info()}
+      <div>如果文件里的令牌看起来像 <code>$wbEncrypted</code> 开头的一段乱码，那是客户端的加密格式，网页里解不开；请改用方法 A，或先用开源工具解密再粘贴。</div>
+    </div>
+
+    <div class="sheet-actions">
+      <button class="btn btn-soft" data-act="close-sheet">我知道了</button>
+    </div>
+  `);
+}
+
 function openBindSheet(preset = {}) {
   openSheet(`
     <h2 class="sheet-title">粘贴授权信息</h2>
@@ -919,6 +982,7 @@ function openBindSheet(preset = {}) {
       </div>
       <div class="sheet-actions">
         <button class="btn btn-primary" type="submit">完成绑定</button>
+        <button class="btn btn-quiet" type="button" data-act="token-guide">不知道从哪复制？看这里</button>
         <button class="btn btn-quiet" type="button" data-act="close-sheet">取消</button>
       </div>
     </form>
@@ -1272,6 +1336,14 @@ document.addEventListener('click', (e) => {
       break;
     case 'bind-step':
       openBindSheet();
+      break;
+    case 'token-guide':
+      openTokenGuide();
+      break;
+    case 'copy-snippet':
+      navigator.clipboard?.writeText(TOKEN_SNIPPET)
+        .then(() => toast('代码已复制，去电脑上粘贴'))
+        .catch(() => toast('复制失败，长按代码手动选中复制'));
       break;
     case 'demo':
       enableDemo();

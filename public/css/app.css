@@ -932,3 +932,20 @@ textarea.input {
 
 :root[data-theme="dark"] .segment.is-active { background: #262a27; }
 :root[data-theme="light"] .segment.is-active { background: var(--card); }
+
+/* ---------- 代码块（授权信息引导用） ---------- */
+.code {
+  margin: 10px 0 0;
+  padding: 14px;
+  background: var(--paper-2);
+  border-radius: var(--radius-sm);
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 10.5px;
+  line-height: 1.65;
+  color: var(--ink-2);
+  max-height: 240px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  -webkit-overflow-scrolling: touch;
+}
