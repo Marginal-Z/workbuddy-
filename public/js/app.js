@@ -279,6 +279,10 @@ function signedSet(id) {
 /* 视图：登录                                                          */
 /* ------------------------------------------------------------------ */
 
+function nativeLoginPlugin() {
+  return window.Capacitor?.Plugins?.OfficialLogin || null;
+}
+
 function renderAuth() {
   return `
   <div class="auth">
@@ -288,7 +292,7 @@ function renderAuth() {
     <h1 class="auth-title">每天一次签到，<br/>剩下的交给我。</h1>
     <p class="auth-sub">登录 WorkBuddy 账号，签到助手会按你设定的时间自动完成每日签到，连签不断、积分不漏。</p>
     <div class="auth-actions">
-      <button class="btn btn-primary" data-act="login">使用 WorkBuddy 账号登录</button>
+      <button class="btn btn-primary" data-act="${nativeLoginPlugin() ? 'native-login' : 'login'}">使用 WorkBuddy 账号登录</button>
       <button class="btn btn-soft" data-act="demo">以演示模式预览</button>
     </div>
     <div class="auth-spacer"></div>
@@ -865,6 +869,29 @@ async function refreshStatus({ silent = true } = {}) {
 /* ------------------------------------------------------------------ */
 
 function openLoginSheet(opts = {}) {
+  if (nativeLoginPlugin() && !opts.rebind) {
+    openSheet(`
+      <h2 class="sheet-title">登录 WorkBuddy</h2>
+      <p class="sheet-sub">在 App 内打开官方登录页，用微信或 QQ 完成授权。登录成功后会自动读取登录态并完成绑定，不用手动复制任何东西。</p>
+      <div class="steps">
+        <div class="step"><div class="step-num">1</div><div>
+          <div class="step-title">点下面的按钮</div>
+          <div class="step-text">会打开 WorkBuddy 官方登录页。</div></div></div>
+        <div class="step"><div class="step-num">2</div><div>
+          <div class="step-title">用微信或 QQ 授权</div>
+          <div class="step-text">和平时登录一样，授权完成会自动回到首页。</div></div></div>
+        <div class="step"><div class="step-num">3</div><div>
+          <div class="step-title">点「已完成」</div>
+          <div class="step-text">App 会读取登录态并自动绑定账号。</div></div></div>
+      </div>
+      <div class="sheet-actions">
+        <button class="btn btn-primary" data-act="native-login">打开官方登录页</button>
+        <button class="btn btn-quiet" data-act="token-guide">自动识别失败时怎么办</button>
+        <button class="btn btn-quiet" data-act="close-sheet">取消</button>
+      </div>
+    `);
+    return;
+  }
   openSheet(`
     <h2 class="sheet-title">${opts.rebind ? '重新绑定账号' : '登录 WorkBuddy'}</h2>
     <p class="sheet-sub">${opts.rebind ? '原授权可能已过期。' : ''}先在官方页面完成登录，再把授权信息交给签到助手。整个过程只需要一次。</p>
@@ -989,6 +1016,19 @@ function openBindSheet(preset = {}) {
   `);
 }
 
+function uidFromToken(token) {
+  const parts = String(token || '').split('.');
+  if (parts.length !== 3) return '';
+  try {
+    const bin = atob(parts[1].replace(/-/g, '+').replace(/_/g, '/'));
+    const bytes = Uint8Array.from(bin, (ch) => ch.charCodeAt(0));
+    const payload = JSON.parse(new TextDecoder().decode(bytes));
+    return String(payload.uid || payload.userId || payload.user_id || payload.sub || '');
+  } catch {
+    return '';
+  }
+}
+
 function parseBinding(rawToken, uidInput, domainInput) {
   let token = String(rawToken || '').trim();
   let uid = String(uidInput || '').trim();
@@ -1004,17 +1044,7 @@ function parseBinding(rawToken, uidInput, domainInput) {
   if (!token) throw new ApiError('BIND', '没有找到 accessToken');
   if (token.length < 8) throw new ApiError('BIND', 'accessToken 看起来不完整');
 
-  if (!uid) {
-    const parts = token.split('.');
-    if (parts.length === 3) {
-      try {
-        const bin = atob(parts[1].replace(/-/g, '+').replace(/_/g, '/'));
-        const bytes = Uint8Array.from(bin, (ch) => ch.charCodeAt(0));
-        const payload = JSON.parse(new TextDecoder().decode(bytes));
-        uid = String(payload.uid || payload.userId || payload.user_id || payload.sub || '');
-      } catch { /* 不是 JWT 就算了 */ }
-    }
-  }
+  if (!uid) uid = uidFromToken(token);
   if (!/^\d{1,32}$/.test(uid)) throw new ApiError('BIND', '还需要填写数字 UID（在账号信息里可以看到）');
   return { token, uid, domain };
 }
@@ -1028,6 +1058,10 @@ async function bindAccount(form) {
     toast(err.message);
     return;
   }
+  await commitCredential(cred);
+}
+
+async function commitCredential(cred) {
   state.accounts = state.accounts.filter((a) => !a.demo);
   const existing = state.accounts.find((a) => a.uid === cred.uid);
   if (existing) {
@@ -1053,6 +1087,86 @@ async function bindAccount(form) {
   render();
   toast('绑定成功，正在同步签到状态');
   await refreshStatus({ silent: false });
+}
+
+/** 解析原生 WebView 抓回来的登录态，尽量找出 accessToken 与 uid */
+function credentialFromNative(raw) {
+  if (!raw) return null;
+  let outer;
+  try { outer = JSON.parse(raw); } catch { return null; }
+
+  // evaluateJavascript 的返回值是带引号的 JSON 字符串，可能需要多解一层
+  let dump = outer.dump;
+  for (let i = 0; i < 3 && typeof dump === 'string'; i++) {
+    try {
+      const next = JSON.parse(dump);
+      if (next && typeof next === 'object') { dump = next; break; }
+      dump = next;
+    } catch { break; }
+  }
+
+  const values = [];
+  if (dump && typeof dump === 'object') {
+    for (const v of Object.values(dump.local || {})) values.push(v);
+    for (const v of Object.values(dump.session || {})) values.push(v);
+  }
+
+  for (const v of values) {
+    if (typeof v !== 'string' || v.length < 20) continue;
+    try {
+      const j = JSON.parse(v);
+      const token = j.accessToken || j.access_token || j.token;
+      if (typeof token === 'string' && token.length > 20) {
+        return {
+          token,
+          uid: String(j.uid || j.userId || j.user_id || uidFromToken(token) || ''),
+          domain: 'www.workbuddy.cn',
+        };
+      }
+    } catch { /* 不是 JSON，继续 */ }
+  }
+
+  for (const v of values) {
+    if (typeof v === 'string' && v.split('.').length === 3 && v.length > 40) {
+      return { token: v, uid: uidFromToken(v), domain: 'www.workbuddy.cn' };
+    }
+  }
+
+  const cookie = String(outer.cookies || '');
+  for (const part of cookie.split(';')) {
+    const [name, ...rest] = part.trim().split('=');
+    const value = rest.join('=');
+    if (/token/i.test(name) && value.length > 20) {
+      return { token: value, uid: uidFromToken(value), domain: 'www.workbuddy.cn' };
+    }
+  }
+  return null;
+}
+
+async function startNativeLogin() {
+  const plugin = nativeLoginPlugin();
+  if (!plugin) {
+    openLoginSheet();
+    return;
+  }
+  try {
+    const out = await plugin.login({ url: 'https://www.workbuddy.cn/' });
+    const cred = credentialFromNative(out?.data);
+    if (cred?.token && cred.uid) {
+      await commitCredential(cred);
+      toast('已登录并完成绑定');
+      return;
+    }
+    if (cred?.token) {
+      openBindSheet({ token: cred.token });
+      toast('已取到令牌，确认 UID 后完成绑定');
+      return;
+    }
+    openBindSheet({});
+    toast('没有自动识别到令牌，请手动粘贴');
+  } catch (err) {
+    if (!/cancel/i.test(String(err?.message || err))) toast('登录没有完成');
+  }
 }
 
 function enableDemo() {
@@ -1333,6 +1447,10 @@ document.addEventListener('click', (e) => {
       break;
     case 'login':
       openLoginSheet();
+      break;
+    case 'native-login':
+      closeSheet();
+      startNativeLogin();
       break;
     case 'bind-step':
       openBindSheet();
