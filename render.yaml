@@ -1,0 +1,20 @@
+# 一键部署到 Render（https://render.com）
+# 免费实例没有持久磁盘，容器重启会丢失 data/；要稳定的云端代签请用 starter 及以上。
+services:
+  - type: web
+    name: workbuddy-checkin
+    runtime: docker
+    plan: starter
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: WB_SECRET
+        generateValue: true
+      - key: WB_ACCESS_KEY
+        sync: false
+      - key: HOST
+        value: 0.0.0.0
+    disk:
+      name: workbuddy-data
+      mountPath: /app/data
+      sizeGB: 1

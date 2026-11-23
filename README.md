@@ -64,9 +64,34 @@ WB_ACCESS_KEY='给 App 用的访问口令' \
 PORT=8080 node server.mjs
 ```
 
-`WB_ACCESS_KEY` 设置后，云端相关接口都要带 `X-Access-Key` 头（App 端暂未内置该输入，公开部署前请先补上，或放在反向代理后面做鉴权）。
+`WB_ACCESS_KEY` 设置后，签到代理与云端接口都要带 `X-Access-Key` 头；App 里在「我的 → 访问口令」填同一个值即可。
 
 > 服务端保存的是完整账号令牌，等同账号密码。请只部署在自己的机器上，并做好磁盘与备份的访问控制。
+
+## 部署
+
+```bash
+export WB_SECRET="$(openssl rand -base64 32)"   # 加密密钥，换掉等于作废旧凭据
+export WB_ACCESS_KEY="<访问口令>"
+docker compose up -d --build                     # 或者 docker build -t wb-checkin . && docker run
+```
+
+| 变量 | 说明 |
+|---|---|
+| `WB_SECRET` | 凭据加密密钥（必填，务必固定保存） |
+| `WB_ACCESS_KEY` | 接口访问口令；为空则不鉴权，公网部署务必设置 |
+| `PORT` / `HOST` | 监听端口与地址，默认 `5178` / `0.0.0.0` |
+| `WB_DATA_DIR` | 数据目录，默认 `./data`，容器里是 `/app/data` |
+
+Render 用户可以直接用仓库里的 `render.yaml`（需要持久磁盘，免费实例重启会丢数据）。HTTPS 可以用 Caddy 一行反代：
+
+```
+checkin.example.com {
+    reverse_proxy 127.0.0.1:8080
+}
+```
+
+推送必须 HTTPS。完整的真机验证步骤见 [docs/verification.md](docs/verification.md)。
 
 ## 通知
 

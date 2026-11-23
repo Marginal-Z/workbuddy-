@@ -1,0 +1,9 @@
+node_modules
+data
+android
+docs
+.git
+.github
+scripts
+*.log
+.gitignore

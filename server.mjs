@@ -68,6 +68,7 @@ function validToken(token) {
 /* ------------------------------ 路由：签到代理 ------------------------------ */
 
 async function handleProxy(req, res) {
+  if (!guard(req)) return json(res, 403, { error: 'access key required' });
   let body;
   try { body = await readBody(req); } catch { return json(res, 400, { error: 'bad request' }); }
   const { token, uid, domain, apiPath, payload } = body || {};

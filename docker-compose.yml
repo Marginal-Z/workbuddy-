@@ -1,0 +1,13 @@
+services:
+  checkin:
+    build: .
+    container_name: workbuddy-checkin
+    ports:
+      - "8080:8080"
+    environment:
+      WB_SECRET: ${WB_SECRET:?请先设置 WB_SECRET}
+      WB_ACCESS_KEY: ${WB_ACCESS_KEY:-}
+      HOST: 0.0.0.0
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped

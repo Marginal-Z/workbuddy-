@@ -19,7 +19,7 @@ const state = {
   view: 'today',
   accounts: [],
   activeId: null,
-  settings: { auto: true, time: '00:05', theme: 'auto', push: false, server: '' },
+  settings: { auto: true, time: '00:05', theme: 'auto', push: false, server: '', accessKey: '' },
   history: {},
   status: null,
   statusAt: null,
@@ -121,6 +121,12 @@ function apiUrl(pathname) {
   return base ? base + pathname : pathname;
 }
 
+function apiHeaders(extra = {}) {
+  const headers = { ...extra };
+  if (state.settings.accessKey) headers['x-access-key'] = state.settings.accessKey;
+  return headers;
+}
+
 class ApiError extends Error {
   constructor(code, message) {
     super(message);
@@ -148,7 +154,7 @@ async function callApi(cred, apiPath, payload = {}) {
   try {
     const r = await fetch(apiUrl('/api/wb'), {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: apiHeaders({ 'content-type': 'application/json' }),
       body: JSON.stringify({
         token: cred.token,
         uid: cred.uid,
@@ -157,6 +163,7 @@ async function callApi(cred, apiPath, payload = {}) {
         payload,
       }),
     });
+    if (r.status === 403) throw new ApiError('KEY', '访问口令不正确，请在「我的 → 访问口令」里更新');
     res = await r.json();
     if (!r.ok) throw new ApiError('ERROR', res?.error || `请求失败（${r.status}）`);
   } catch (err) {
@@ -664,6 +671,14 @@ function renderSettings() {
           </div>
           ${icons.chevronRight()}
         </button>
+        <button class="row is-btn" data-act="edit-key">
+          <div class="row-icon">${icons.shield()}</div>
+          <div class="row-main">
+            <div class="row-title">访问口令</div>
+            <div class="row-sub clip">${state.settings.accessKey ? '已设置' : '未设置（服务端开启鉴权时填写）'}</div>
+          </div>
+          ${icons.chevronRight()}
+        </button>
       </div>
     </div>
 
@@ -1103,8 +1118,9 @@ function switchAccount(id) {
 
 async function cloudFetch(pathname, body) {
   const res = await fetch(apiUrl(pathname), body
-    ? { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }
-    : {});
+    ? { method: 'POST', headers: apiHeaders({ 'content-type': 'application/json' }), body: JSON.stringify(body) }
+    : { headers: apiHeaders() });
+  if (res.status === 403) throw new ApiError('KEY', '访问口令不正确，请在「我的 → 访问口令」里更新');
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
     throw new ApiError('CLOUD', data.error || `云端服务不可用（${res.status}）`);
@@ -1229,6 +1245,9 @@ document.addEventListener('click', (e) => {
   switch (act) {
     case 'edit-server':
       openServerSheet();
+      break;
+    case 'edit-key':
+      openKeySheet();
       break;
     case 'toggle-cloud':
       toggleCloud();
@@ -1381,6 +1400,7 @@ document.addEventListener('submit', (e) => {
   if (!form) return;
   if (form.dataset.form === 'bind') bindAccount(form);
   else if (form.dataset.form === 'server') saveServer(form);
+  else if (form.dataset.form === 'key') saveKey(form);
 });
 
 document.addEventListener('keydown', (e) => {
@@ -1408,6 +1428,35 @@ function openServerSheet() {
       </div>
     </form>
   `);
+}
+
+function openKeySheet() {
+  openSheet(`
+    <h2 class="sheet-title">访问口令</h2>
+    <p class="sheet-sub">服务端设置了 WB_ACCESS_KEY 时，所有云端与签到请求都要带上这个口令。留空表示服务端没有开启鉴权。</p>
+    <form data-form="key" novalidate>
+      <div class="field">
+        <label class="field-label" for="f-key">口令</label>
+        <input class="input" id="f-key" name="key" type="password" placeholder="留空 = 不发送口令"
+          value="${esc(state.settings.accessKey || '')}" autocomplete="off" spellcheck="false" />
+        <div class="hint">只保存在这台设备的浏览器里。</div>
+      </div>
+      <div class="sheet-actions">
+        <button class="btn btn-primary" type="submit">保存</button>
+        <button class="btn btn-quiet" type="button" data-act="close-sheet">取消</button>
+      </div>
+    </form>
+  `);
+}
+
+function saveKey(form) {
+  const value = String(new FormData(form).get('key') || '').trim();
+  state.settings.accessKey = value;
+  write(KEY.settings, state.settings);
+  closeSheet();
+  render();
+  toast(value ? '访问口令已保存' : '已清空访问口令');
+  cloudRefresh().then(render);
 }
 
 async function saveServer(form) {
